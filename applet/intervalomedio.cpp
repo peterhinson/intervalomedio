@@ -1,3 +1,6 @@
+#include "WProgram.h"
+void setup();
+void loop();
 /*
  *  Intervalemedio
  *  Peter Hinson / 2011
