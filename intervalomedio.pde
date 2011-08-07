@@ -15,14 +15,17 @@
 #include "Intervalometer.h"
 #include "LCDMenu.h"
 #include "ADKeyboard.h"
+#include "Event.h"
 
 LCDMenu 		*menu;
 ADKeyboard		*keypad;
 Intervalometer	*timelapse;
 
-void eventHandler(char*, float) {
-	
-}
+#define kIntervalEvent 	10
+#define kExposureEvent 	11
+#define kDelayEvent		12
+
+void handleEvent(Event);
 
 void setup()
 {
@@ -36,9 +39,9 @@ void setup()
 	LCDMenuSection *menu_sec = menu->getCurrentSection();
 //	SetValueCallback cb = *(timelapse->setInterval);
 //	Callback cb = methodCallback(*timelapse, &Intervalometer::setInterval );
-	menu_sec->addParameter(new LCDMenuParameter("Interval (seconds)", 5.0f, 1.0f, true));
-	menu_sec->addParameter(new LCDMenuParameter("Exposure", 1.0f, 1.0f, true));
-	menu_sec->addParameter(new LCDMenuParameter("Item Four", 1.0f, 1.0f, true));
+	menu_sec->addParameter(new LCDMenuParameter("Interval (secs)", kIntervalEvent, 5.0f, 1.0f, true, handleEvent));
+	menu_sec->addParameter(new LCDMenuParameter("Exposure (msecs)", kExposureEvent, 250.0f, 50.0f, true, handleEvent));
+	menu_sec->addParameter(new LCDMenuParameter("Item Four", kDelayEvent, 1.0f, 1.0f, true, handleEvent));
 	Serial.print("test..");
 }
 
@@ -68,3 +71,16 @@ void loop()
 	delay(100);
 }
 
+void handleEvent(Event event) {
+	switch (event.source) {
+		case kIntervalEvent:
+			timelapse->setInterval(event.value);
+			break;
+		default:
+			break;
+	}
+}
+
+void setExpos(float) {
+	
+}

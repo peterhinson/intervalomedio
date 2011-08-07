@@ -13,8 +13,7 @@
 
 #include <stdlib.h>
 #include "WProgram.h"
-#include "AikoCallback.h"
-
+#include "Event.h"
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * LCDMenuParameter
@@ -22,29 +21,30 @@
  * *	Single menu items. Stores values, display names, etc. 
  * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
+	
+typedef void (*SetValueCallback)(Event);
 		
 class LCDMenuParameter {
 	private:
 		char					*_name;
+		int						_id;					// For identifying events...
 		float					_value;
 		float					_inc;
 		bool					_display_float;
 		
-		Callback			_setValueCallback;
+		SetValueCallback		_setValueCallback;
 		
 	public:
 		LCDMenuParameter() { }
 		
-		void doNothing(float) {}
-		
-		LCDMenuParameter(char in_name[], float in_value, float in_inc, bool in_display_float) 
+		LCDMenuParameter(char in_name[], int id_tag, float in_value, float in_inc, bool in_display_float, SetValueCallback setValueCallback = NULL) 
 		{
 			_name				= in_name;
+			_id					= id_tag;
 			_value				= in_value;
 			_inc 				= in_inc;
 			_display_float		= in_display_float;
-		//	_setValueCallback	= setValueCallback;
+			_setValueCallback	= setValueCallback;
 		}
 //		typedef void (*SetValueCallback)(const float);
 //		typedef std::tr1::function<void (float)> setValueCallback;			// Called for each value change
@@ -64,8 +64,14 @@ class LCDMenuParameter {
 		{
 			if (_value != new_value) {
 				_value = new_value;
-			//	if (_setValueCallback != NULL) {}
-			//		_setValueCallback(new_value);		// If a callback is set for this value, call it.
+				if (_setValueCallback) { // If a callback is set for this value, create an event and call it.
+					Event event;
+					event.source	= _id;
+					event.time		= millis();
+					event.value		= new_value;
+					_setValueCallback(event);
+				}
+							
 			}
 		}
 		
@@ -74,11 +80,10 @@ class LCDMenuParameter {
 			setValue(_value + (_inc*steps));
 		}
 		
-		void registerSetValueCallback(Callback newCallback)
+		void registerSetValueCallback(SetValueCallback newCallback)
 		{
 			this->_setValueCallback = newCallback;
 		}
-		
 };
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
