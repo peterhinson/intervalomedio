@@ -21,11 +21,11 @@
  * *	Single menu items. Stores values, display names, etc. 
  * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-	
+
 typedef void (*SetValueCallback)(Event);
 		
 class LCDMenuParameter {
-	private:
+	protected:
 		char					*_name;
 		int						_id;					// For identifying events...
 		float					_value;
@@ -39,20 +39,31 @@ class LCDMenuParameter {
 		
 		LCDMenuParameter(char in_name[], int id_tag, float in_value, float in_inc, bool in_display_float, SetValueCallback setValueCallback = NULL) 
 		{
-			_name				= in_name;
-			_id					= id_tag;
+			init(in_name, id_tag, setValueCallback);
 			_value				= in_value;
 			_inc 				= in_inc;
 			_display_float		= in_display_float;
+		}
+		
+		void init(char in_name[], int id_tag, SetValueCallback setValueCallback) 
+		{
+			_name				= in_name;
+			_id					= id_tag;
 			_setValueCallback	= setValueCallback;
 		}
-//		typedef void (*SetValueCallback)(const float);
-//		typedef std::tr1::function<void (float)> setValueCallback;			// Called for each value change
-//		typedef std::tr1::function<void (float)> saveValueCallback;			// Called when no changes have been made for a timeout
 		
 		float getValue()
 		{
 			return _value;
+		}
+		
+		virtual char* getDisplayValue()
+		{
+			char string[10];
+	//		String f = (int)getValue();
+			
+			snprintf(string, 10, "%f",getValue());
+			return string;
 		}
 		
 		char* getName()
@@ -69,6 +80,7 @@ class LCDMenuParameter {
 					event.source	= _id;
 					event.time		= millis();
 					event.value		= new_value;
+					event.object	= this;
 					_setValueCallback(event);
 				}
 							
@@ -84,6 +96,59 @@ class LCDMenuParameter {
 		{
 			this->_setValueCallback = newCallback;
 		}
+		
+		virtual bool isFloatValue() { return true; }
+};
+
+class LCDMenuButton : public LCDMenuParameter {
+	protected:
+		int						_num_states;
+		int						_state;
+		char**					_state_values;
+		
+	public:
+		LCDMenuButton() { }
+		
+		LCDMenuButton(char in_name[], int id_tag, char* state_values[], int num_states=1, int init_state = 0, SetValueCallback setValueCallback = NULL) 
+		{
+			init(in_name, id_tag, setValueCallback);
+			_state_values		= state_values;
+			_num_states			= num_states;
+			_state				= init_state;
+		}
+		
+		char* getDisplayValue()
+		{
+			return _state_values[_state];
+		}
+		
+		bool validState(int state) {
+			return (state >= 0 && state < _num_states) ? true : false;
+		}
+		
+		void setValue(int new_value)
+		{
+			if (_state != new_value && validState(new_value)) {
+				_state = new_value;
+				if (_setValueCallback) { // If a callback is set for this value, create an event and call it.
+					Event event;
+					event.source	= _id;
+					event.time		= millis();
+					event.value		= _state;
+					event.object	= this;
+					_setValueCallback(event);
+				}			
+			} else if (!validState(_state)) _state = 0;
+		}
+		
+		void incValue(int steps)
+		{
+			if (_state + steps >= _num_states) incValue(_state + steps - _num_states);
+			else if (_state+steps < 0) setValue(_num_states - 1 - (_state + steps));
+			else setValue(_state + steps);
+		}
+		
+		bool isFloatValue() { return false; }
 };
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -97,35 +162,34 @@ class LCDMenuParameter {
 class LCDMenuSection {
 	private:
 		//LCDMenuItem[]		submenus;
-		LCDMenuParameter	*params[8];
-		int					num_params;
-		int					index;				// Currently selected param/submenu
+		LCDMenuParameter	*_params[8];			// TODO: make this a linked list.
+		int					_num_params;
+		int					_index;				// Currently selected param/submenu
 		
 	public:
 		LCDMenuSection()
 		{
-			num_params = 0;
-			index = 0;
+			_num_params	= 0;
+			_index		= 0;
 		}
 		
 		LCDMenuParameter* getCurrentParameter()
 		{
-			if (index >= 0 && index < num_params)
-				return params[index];
+			if (_index >= 0 && _index < _num_params)
+				return _params[_index];
 			else
 				return new LCDMenuParameter();
 		}
 		
 		void addParameter(LCDMenuParameter *new_param)
 		{
-			if (num_params < 8) {
-				params[num_params++] = new_param;
+			if (_num_params < 8) {
+				_params[_num_params++] = new_param;
 			}	// TODO: Should fail gracefully... or create a new array!
 		}
 		
-		
-		void nextItem() { if (index < num_params-1) index++; else index = 0; }
-		void prevItem() { if (index > 0) index--; else index = num_params-1; }
+		void nextItem() { if (_index < _num_params-1) _index++; else _index = 0; }
+		void prevItem() { if (_index > 0) _index--; else _index = _num_params-1; }
 };
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -138,72 +202,105 @@ class LCDMenuSection {
 
 class LCDMenu {
 	private:
-		int				index;
-		bool			dirty;
-		LCDMenuSection	*root;
-		LCDMenuSection	*cur_section;
+		int					_index;
+		bool				_dirty;
+		bool				_dirt[2];
+		bool				_is_asleep;
+		int					_sleep_timeout;				// Milliseconds of inactivity before the display is put to sleep
+		unsigned long		_last_activity_time;		// Time of last activity (redraw)
+		LCDMenuSection		*_root;
+		LCDMenuSection		*_cur_section;
 		
 	public:
 		LCDMenu()
-		{
-			dirty = true;
+		{			
+			_root			= NULL;
+			_cur_section	= NULL;
+			_is_asleep		= false;
+			_sleep_timeout	= 30*1000;
+			
 			clearLCD();
 			backlightOn();
-			cur_section = NULL;
+			screenSize(5);
+			setDirty(true);
 		};
 		
 		void printMenu()
 		{
-			if (dirty) {					// If marked for redraw...
-				dirty = false;
+			if (_dirty) {					// If marked for redraw...
+				_dirty = false;
 				clearLCD();
 				
-				LCDMenuParameter *cur_param = cur_section->getCurrentParameter();
+				LCDMenuParameter *cur_param = _cur_section->getCurrentParameter();
+				
 				selectLineOne();
 				Serial.print(cur_param->getName());
 				selectLineTwo();
-				Serial.print(cur_param->getValue());		
-			}
+				if (cur_param->isFloatValue()) 	// A hack to avoid float->string formating
+					Serial.print(cur_param->getValue());	
+				else
+					Serial.print(cur_param->getDisplayValue());
+			} else if (millis() - _last_activity_time > _sleep_timeout)
+				sleep();	// Put the screen to sleep after a bit of inactivity
 		}
 		
 		void nextItem() 
 		{
+			_cur_section->nextItem();
 			setDirty(true);
-			cur_section->nextItem();
 		}
 		
 		void prevItem() 
 		{
+			_cur_section->prevItem();
 			setDirty(true);
-			cur_section->prevItem();
 		}
 		
 		void incCurrentParam(float inc) 
 		{
-			setDirty(true);
-			cur_section->getCurrentParameter()->incValue(inc);
+			_cur_section->getCurrentParameter()->incValue(inc);
+			setDirty(true, 2);
 		}
 		
-		void addSection(LCDMenuSection *section) 
+		void addSection(LCDMenuSection *section, LCDMenuSection *parent = NULL) 
 		{
 			// Add a submenu or group of parameters... LCDMenu only works with one section currently.
-			root		= section;		// Temp. Should only be for the first item.
-			cur_section	= section;		// Set this to the active section 
+			_cur_section = section;		// Set this to the active section 
+			if (_root == NULL)
+				_root = section;		// Temp. Should only be for the first item.
+			
+			setDirty(true);
 		}
 		
-		LCDMenuSection * getCurrentSection() 
+		LCDMenuSection * getCurrentSection() { return _cur_section; }
+		
+		void setDirty(bool is_dirty, int row = 0) 
 		{
-			return cur_section;
+			
+			if (row <= 0) {
+				_dirty = is_dirty;	// Mark LCD for refresh
+				for (int i = 0; i < 2; i++ ) _dirt[i] = is_dirty;
+			}
+			else _dirt[row < 2 ? row-1 : 1] = is_dirty;
+			
+			stayAwake();
 		}
 		
-		void setDirty(bool is_dirty) 
+		bool isDirty() { return _dirty; }
+		
+		void stayAwake()
 		{
-			dirty = is_dirty;			// Mark LCD for refresh
+			if (_is_asleep) {
+				backlightOn();
+				_is_asleep = false;
+			}
+			_last_activity_time = millis();
 		}
 		
-		bool isDirty() 
+		void sleep()
 		{
-			return dirty;
+			backlightOff();
+			_is_asleep = true;
 		}
 		
 		/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
@@ -256,6 +353,14 @@ class LCDMenu {
 			Serial.print(128, BYTE);	// light level for off.
 			delay(10);
 		}
+		
+		void screenSize(int size)		
+		{	// This can be 3-6, controls the resolution
+			Serial.print(0x7C, BYTE);
+			Serial.print(size, DEC);
+			delay(10);
+		}
+		
 		void LCDCommand()
 		{   // A general function to call the command flag for issuing all other commands   
 			Serial.print(0xFE, BYTE);

@@ -23,7 +23,8 @@ typedef unsigned long ulong;
  * * * Intervalometer Prototype
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-class Intervalometer {
+class Intervalometer 
+{
 	public:
 		int lapse_time;			// Delay between exposures, in seconds
 		int exposure_time;		// Exposure. 1000 = 1 sec
@@ -67,8 +68,9 @@ class Intervalometer {
  * * 	compile that from TextMate.
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-Intervalometer::Intervalometer() {
-	lapse_time		= 5;          
+Intervalometer::Intervalometer() 
+{
+	lapse_time		= 1000;          
 
 	focus_pin		= 9;        
 	shutter_pin		= 7;
@@ -87,11 +89,12 @@ Intervalometer::Intervalometer() {
 	pinMode(focus_pin, OUTPUT);
 }
 
-Intervalometer::Intervalometer(int in_focus_pin, int in_shutter_pin) {
-	lapse_time		= 5;          
+Intervalometer::Intervalometer(int in_focus_pin = 9, int in_shutter_pin = 7) 
+{
+	lapse_time		= 1000;          
 
-	focus_pin		= 9;        
-	shutter_pin		= 7;
+	focus_pin		= in_focus_pin;        
+	shutter_pin		= in_shutter_pin;
 
 	shutter_on		= 200;     
 	shutter_wait	= 5000;	
@@ -101,13 +104,15 @@ Intervalometer::Intervalometer(int in_focus_pin, int in_shutter_pin) {
 	focus			= false;
 	active			= true;
 	
+	previous_time	= 0;
 	frame_count		= 0;
 	
  	pinMode(shutter_pin, OUTPUT);
 	pinMode(focus_pin, OUTPUT);
 }
 
-void Intervalometer::loop() {
+void Intervalometer::loop() 
+{
 	if (active && millis() - previous_time > lapse_time) {
 		// Could take into account wakeup/focus time and substract from lapse_time above?
 		wakeAndFocus();
@@ -118,7 +123,8 @@ void Intervalometer::loop() {
 	}
 }
 
-void Intervalometer::triggerShutter() {
+void Intervalometer::triggerShutter() 
+{
 	previous_time = millis();			// Record the time that we start the exposure
 	
     digitalWrite(shutter_pin, HIGH);
@@ -128,7 +134,8 @@ void Intervalometer::triggerShutter() {
     frame_count++;
 }
 
-void Intervalometer::wakeAndFocus() {
+void Intervalometer::wakeAndFocus() 
+{
 	digitalWrite(focus_pin, HIGH);        // Wake the camera up/focus
     delay(wakeup);                        // Wait for it...
     digitalWrite(focus_pin, LOW);
@@ -136,17 +143,20 @@ void Intervalometer::wakeAndFocus() {
     delay(wake_wait);
 }
 
-void Intervalometer::start() {
+void Intervalometer::start() 
+{
 	previous_time	= 0;
 	active			= true;
 	frame_count		= 0;
 }
 
-void Intervalometer::stop() {
+void Intervalometer::stop() 
+{
 	active = false;
 }
 
-void Intervalometer::setInterval(float seconds) {
+void Intervalometer::setInterval(float seconds) 
+{
 	lapse_time = (int)(seconds*1000.0f);
 }
 

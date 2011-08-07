@@ -40,12 +40,12 @@ void setup()
 	
 	menu->addSection(new LCDMenuSection);
 	LCDMenuSection *menu_sec = menu->getCurrentSection();
-//	SetValueCallback cb = *(timelapse->setInterval);
-//	Callback cb = methodCallback(*timelapse, &Intervalometer::setInterval );
+	
+	char *toggle[]	= { "On", "Off" };
+	
 	menu_sec->addParameter(new LCDMenuParameter("Interval (secs)", kIntervalEvent, 5.0f, 1.0f, true, handleEvent));
 	menu_sec->addParameter(new LCDMenuParameter("Exposure (msecs)", kExposureEvent, 250.0f, 50.0f, true, handleEvent));
-	menu_sec->addParameter(new LCDMenuParameter("Item Four", kDelayEvent, 1.0f, 1.0f, true, handleEvent));
-	Serial.print("test..");
+	menu_sec->addParameter(new LCDMenuButton("Activity", kDelayEvent, toggle, 2, 0, handleEvent));
 }
 
 void loop()
@@ -65,19 +65,24 @@ void loop()
 			case 4:
 				menu->incCurrentParam(-1.0f);
 				break;
+			case 0:
+				timelapse->triggerShutter();
+				break;
 			default:
 				break;
 		}
 	}
+	timelapse->loop();
 	menu->printMenu();
 	
-	delay(100);
+	delay(30);
 }
 
 void handleEvent(Event event) {
 	switch (event.source) {
 		case kIntervalEvent:
 			timelapse->setInterval(event.value);
+			
 			break;
 		default:
 			break;

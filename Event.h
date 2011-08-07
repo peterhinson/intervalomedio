@@ -3,8 +3,9 @@
 
 #include "WProgram.h"
 
-struct Event {
-//	LCDMenuParameter	*param;
+struct Event 
+{
+	void				*object;
 	unsigned long		time;
 	int					source;
 	int					type;
