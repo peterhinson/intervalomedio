@@ -229,17 +229,23 @@ class LCDMenu {
 		{
 			if (_dirty) {					// If marked for redraw...
 				_dirty = false;
-				clearLCD();
+				if (_dirt[0] && _dirt[1]) clearLCD();
 				
 				LCDMenuParameter *cur_param = _cur_section->getCurrentParameter();
 				
-				selectLineOne();
-				Serial.print(cur_param->getName());
-				selectLineTwo();
-				if (cur_param->isFloatValue()) 	// A hack to avoid float->string formating
-					Serial.print(cur_param->getValue());	
-				else
-					Serial.print(cur_param->getDisplayValue());
+				if (_dirt[0]) {
+					selectLineOne();
+					Serial.print(cur_param->getName());
+					_dirt[0] = false;
+				}
+				if (_dirt[1]) {
+					selectLineTwo();
+					if (cur_param->isFloatValue()) 	// A hack to avoid float->string formating
+						Serial.print(cur_param->getValue());	
+					else
+						Serial.print(cur_param->getDisplayValue());
+					_dirt[1] = false;
+				}
 			} else if (millis() - _last_activity_time > _sleep_timeout)
 				sleep();	// Put the screen to sleep after a bit of inactivity
 		}
@@ -275,13 +281,12 @@ class LCDMenu {
 		LCDMenuSection * getCurrentSection() { return _cur_section; }
 		
 		void setDirty(bool is_dirty, int row = 0) 
-		{
-			
+		{			
+			_dirty = is_dirty;	// Mark LCD for refresh
 			if (row <= 0) {
-				_dirty = is_dirty;	// Mark LCD for refresh
 				for (int i = 0; i < 2; i++ ) _dirt[i] = is_dirty;
 			}
-			else _dirt[row < 2 ? row-1 : 1] = is_dirty;
+			else _dirt[row <= 2 ? row-1 : 1] = is_dirty;
 			
 			stayAwake();
 		}

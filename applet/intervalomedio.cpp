@@ -14,7 +14,6 @@ void loop();
 #include <stdlib.h>
 #include "util.h"
 
-#include "AikoCallback.h"
 #include "Intervalometer.h"
 #include "LCDMenu.h"
 #include "ADKeyboard.h"
