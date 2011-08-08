@@ -1,4 +1,24 @@
+/*
+ *  ADKeyboard.h
+ *  Peter Hinson / 2011
+ *	mewp.net
+ *	
+ *  Intervalometer making use of a keypad and LCD menu system.
+ *	Sort of an excuse to develop classes for these components.
+ *
+ */
+
+#ifndef ADKeyboard_h
+#define ADKeyboard_h
+
 #include "WProgram.h"
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * ADKeyboard
+ * *  ---------------------------------------------------------
+ * *	Interface for a ADKeyboard controller.
+ * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 class ADKeyboard {
 	private:
@@ -11,6 +31,7 @@ class ADKeyboard {
 		int repeat_delay;
 		int repeat_rate;
 		unsigned long previous_time;
+		int last_read_time;
 
 	public:
 		ADKeyboard(int pin = 0) 
@@ -22,11 +43,16 @@ class ADKeyboard {
 			last_adc				= 0;
 			repeat_delay			= 800;
 			repeat_rate				= 150;
-			previous_time			= 0;	
+			previous_time			= 0;
+	/*		
+			last_check_time			= 0;				// The last time we did an analogRead
+			debounce_time			= 0;
+	*/
 		}
 		
 		int readKeyboard()
 		{
+			
 			adc_key_in	= analogRead(in_pin);   		// read the value from the sensor
 			key 		= get_key(adc_key_in);  		// convert into key press
 			
@@ -71,3 +97,5 @@ class ADKeyboard {
 			return k;
 		}
 };
+
+#endif

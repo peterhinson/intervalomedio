@@ -1,3 +1,5 @@
+#ifndef InterUtils_h
+#define InterUtils_h
 /*
 __extension__ typedef int __guard __attribute__((mode (__DI__)));
 
@@ -19,3 +21,5 @@ void operator delete(void * ptr)
 {
   free(ptr);
 }
+
+#endif

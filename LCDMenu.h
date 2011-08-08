@@ -1,19 +1,25 @@
 /*
- *  LCD Menu System
+ *  LCDMenu.h
  *  Peter Hinson / 2011
  *	mewp.net
  *
  *  Provides a basic, navigatable menu system.
  *	Works as is with Sparkfun serial enabled LCD screens.
  *	All model specific code is contained within the LCDMenu class.
+ *
  */
 
 #ifndef LCDMenu_h
 #define LCDMenu_h
+//#include <stdlib.h>
+//#include <iostream>
 
-#include <stdlib.h>
+#include <WString.h>
 #include "WProgram.h"
+
 #include "Event.h"
+
+//using namespace std;
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * LCDMenuParameter
@@ -23,26 +29,31 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 typedef void (*SetValueCallback)(Event);
-		
+
 class LCDMenuParameter {
 	protected:
 		char					*_name;
 		int						_id;					// For identifying events...
 		float					_value;
 		float					_inc;
+		float					_floor;
+		float					_ceiling;
 		bool					_display_float;
-		
 		SetValueCallback		_setValueCallback;
+		
+		String					_state_values;
 		
 	public:
 		LCDMenuParameter() { }
 		
-		LCDMenuParameter(char in_name[], int id_tag, float in_value, float in_inc, bool in_display_float, SetValueCallback setValueCallback = NULL) 
-		{
-			init(in_name, id_tag, setValueCallback);
-			_value				= in_value;
+		LCDMenuParameter(char in_name[], int id_tag, float in_value, float in_inc, float floor = 0.0, float ceiling = 1024.0, bool in_display_float = false, SetValueCallback setValueCallback = NULL) 
+		{	
 			_inc 				= in_inc;
+			_floor				= floor;
+			_ceiling			= ceiling;
 			_display_float		= in_display_float;
+			init(in_name, id_tag, setValueCallback);
+			setValue(in_value);
 		}
 		
 		void init(char in_name[], int id_tag, SetValueCallback setValueCallback) 
@@ -52,29 +63,25 @@ class LCDMenuParameter {
 			_setValueCallback	= setValueCallback;
 		}
 		
-		float getValue()
+		virtual float getValue()
 		{
 			return _value;
 		}
 		
 		virtual char* getDisplayValue()
 		{
-			char string[10];
-	//		String f = (int)getValue();
-			
-			snprintf(string, 10, "%f",getValue());
-			return string;
+			String output = String((int) _value);
+			char buf[24];
+			output.toCharArray(buf, 24);
+			return buf;
 		}
 		
-		char* getName()
-		{
-			return _name;
-		}
+		char* getName() { return _name; }
 		
-		void setValue(float new_value)
+		virtual void setValue(float new_value)
 		{
 			if (_value != new_value) {
-				_value = new_value;
+				_value = constrain(new_value, _floor, _ceiling);
 				if (_setValueCallback) { // If a callback is set for this value, create an event and call it.
 					Event event;
 					event.source	= _id;
@@ -87,7 +94,7 @@ class LCDMenuParameter {
 			}
 		}
 		
-		void incValue(float steps)
+		virtual void incValue(int steps)
 		{
 			setValue(_value + (_inc*steps));
 		}
@@ -97,29 +104,38 @@ class LCDMenuParameter {
 			this->_setValueCallback = newCallback;
 		}
 		
-		virtual bool isFloatValue() { return true; }
+		virtual bool isFloatValue() { return _display_float; }
 };
 
-class LCDMenuButton : public LCDMenuParameter {
+class LCDMenuButton :
+public LCDMenuParameter {
 	protected:
 		int						_num_states;
 		int						_state;
-		char**					_state_values;
 		
 	public:
 		LCDMenuButton() { }
 		
-		LCDMenuButton(char in_name[], int id_tag, char* state_values[], int num_states=1, int init_state = 0, SetValueCallback setValueCallback = NULL) 
+		LCDMenuButton(char in_name[], int id_tag, String state_values[], int num_states=1, int init_state = 0, SetValueCallback setValueCallback = NULL) 
 		{
 			init(in_name, id_tag, setValueCallback);
-			_state_values		= state_values;
-			_num_states			= num_states;
-			_state				= init_state;
+			_state_values			= NULL;
+			_state_values			= String(state_values);
+// 			Serial.print(state_values);
+			_num_states				= num_states;
+			_state					= init_state;
 		}
 		
-		char* getDisplayValue()
+		char * getDisplayValue()
 		{
-			return _state_values[_state];
+			char buf[24];
+			_state_values.toCharArray(buf, 24);
+//			cout << _state_values;
+			
+			//Serial << buf << "State: " << _state;
+			//Serial.println(_state_values);
+			return buf;
+		//	return _state_values[_state];
 		}
 		
 		bool validState(int state) {
@@ -205,6 +221,7 @@ class LCDMenu {
 		int					_index;
 		bool				_dirty;
 		bool				_dirt[2];
+		int					_backlight_level;
 		bool				_is_asleep;
 		int					_sleep_timeout;				// Milliseconds of inactivity before the display is put to sleep
 		unsigned long		_last_activity_time;		// Time of last activity (redraw)
@@ -214,10 +231,11 @@ class LCDMenu {
 	public:
 		LCDMenu()
 		{			
-			_root			= NULL;
-			_cur_section	= NULL;
-			_is_asleep		= false;
-			_sleep_timeout	= 30*1000;
+			_root				= NULL;
+			_cur_section		= NULL;
+			_is_asleep			= false;
+			_sleep_timeout		= 30*1000;
+			_backlight_level	= 150;
 			
 			clearLCD();
 			backlightOn();
@@ -225,6 +243,9 @@ class LCDMenu {
 			setDirty(true);
 		};
 		
+		//--------------------------------------
+		//	+ printMenu
+		//	Handles writing to the LCD
 		void printMenu()
 		{
 			if (_dirty) {					// If marked for redraw...
@@ -240,13 +261,14 @@ class LCDMenu {
 				}
 				if (_dirt[1]) {
 					selectLineTwo();
-					if (cur_param->isFloatValue()) 	// A hack to avoid float->string formating
+					if (cur_param->isFloatValue()) {	// A hack to avoid float->string formating
 						Serial.print(cur_param->getValue());	
-					else
+					} else {
 						Serial.print(cur_param->getDisplayValue());
+					}
 					_dirt[1] = false;
 				}
-			} else if (millis() - _last_activity_time > _sleep_timeout)
+			} else if (!_is_asleep && millis() - _last_activity_time > _sleep_timeout)
 				sleep();	// Put the screen to sleep after a bit of inactivity
 		}
 		
@@ -283,9 +305,10 @@ class LCDMenu {
 		void setDirty(bool is_dirty, int row = 0) 
 		{			
 			_dirty = is_dirty;	// Mark LCD for refresh
-			if (row <= 0) {
+			
+			if (row <= 0) {		// If row=0, update all rows.
 				for (int i = 0; i < 2; i++ ) _dirt[i] = is_dirty;
-			}
+			}					// Otherwise, just update the mentioned row (indexed from 1)
 			else _dirt[row <= 2 ? row-1 : 1] = is_dirty;
 			
 			stayAwake();
@@ -296,16 +319,32 @@ class LCDMenu {
 		void stayAwake()
 		{
 			if (_is_asleep) {
+				// Fade in...
+				int bl = _backlight_level;	// Store the current level
+				for (int i = 128; i > _backlight_level; i++) {
+					backlightBrightness(i);
+					delay(1);
+				}
+				_backlight_level = bl;				
 				backlightOn();
+				
 				_is_asleep = false;
 			}
 			_last_activity_time = millis();
 		}
 		
 		void sleep()
-		{
-			backlightOff();
-			_is_asleep = true;
+		{	// Put the display to sleep until the user interacts with it.
+			if (!_is_asleep) {	
+				int bl = _backlight_level;	// Store the current level
+				for (int i = _backlight_level; i > 128; i--) {
+					backlightBrightness(i);
+					delay(i-128 + (128-i)/2);
+				}
+				_backlight_level = bl;
+				backlightOff();
+				_is_asleep = true;
+			}
 		}
 		
 		/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
@@ -349,7 +388,7 @@ class LCDMenu {
 		void backlightOn()
 		{	// Turns on the backlight
 		    Serial.print(0x7C, BYTE);   // command flag for backlight stuff
-		    Serial.print(157, BYTE);    // light level.
+		    Serial.print(_backlight_level, BYTE);    // light level.
 			delay(10);
 		}
 		void backlightOff()
@@ -359,10 +398,19 @@ class LCDMenu {
 			delay(10);
 		}
 		
+		void backlightBrightness(int brightness)
+		{	// Accepts 0-30 or 128-157 (native)
+			if (brightness <= 30 && brightness >= 0) brightness += 128;		// If sent 0-30, bring it up to native
+			_backlight_level = constrain(brightness, 128, 157);
+			Serial.print(0x7C, BYTE);
+			Serial.print(_backlight_level, BYTE);
+			delay(10);
+		}
+		
 		void screenSize(int size)		
 		{	// This can be 3-6, controls the resolution
 			Serial.print(0x7C, BYTE);
-			Serial.print(size, DEC);
+			Serial.print(005, BYTE);
 			delay(10);
 		}
 		

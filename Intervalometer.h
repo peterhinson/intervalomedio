@@ -1,5 +1,5 @@
 /*
- *  Intervalometer
+ *  Intervalometer.h
  *  Peter Hinson / 2011
  *	mewp.net
  *
@@ -102,7 +102,7 @@ Intervalometer::Intervalometer(int in_focus_pin = 9, int in_shutter_pin = 7)
 	wake_wait		= 200;  
 	
 	focus			= false;
-	active			= true;
+	active			= false;
 	
 	previous_time	= 0;
 	frame_count		= 0;
