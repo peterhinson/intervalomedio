@@ -68,27 +68,6 @@ class Intervalometer
  * * 	compile that from TextMate.
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-Intervalometer::Intervalometer() 
-{
-	lapse_time		= 1000;          
-
-	focus_pin		= 9;        
-	shutter_pin		= 7;
-
-	shutter_on		= 200;     
-	shutter_wait	= 5000;	
-	wakeup			= 300;	
-	wake_wait		= 200;
-	
-	focus			= false;
-	active			= true;
-	
-	frame_count		= 0;
-	
- 	pinMode(shutter_pin, OUTPUT);
-	pinMode(focus_pin, OUTPUT);
-}
-
 Intervalometer::Intervalometer(int in_focus_pin = 9, int in_shutter_pin = 7) 
 {
 	lapse_time		= 1000;          
@@ -102,10 +81,11 @@ Intervalometer::Intervalometer(int in_focus_pin = 9, int in_shutter_pin = 7)
 	wake_wait		= 200;  
 	
 	focus			= false;
-	active			= false;
+	active			= true;
 	
 	previous_time	= 0;
 	frame_count		= 0;
+	frame_limit		= -1;
 	
  	pinMode(shutter_pin, OUTPUT);
 	pinMode(focus_pin, OUTPUT);
@@ -115,7 +95,7 @@ void Intervalometer::loop()
 {
 	if (active && millis() - previous_time > lapse_time) {
 		// Could take into account wakeup/focus time and substract from lapse_time above?
-		wakeAndFocus();
+		if (focus) wakeAndFocus();
 		triggerShutter();
 		
 		if (frame_limit != -1 && frame_count >= frame_limit)

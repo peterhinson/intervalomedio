@@ -58,15 +58,13 @@ class ADKeyboard {
 			
 			if (key != oldkey) // if key change is detected
 			{
-
+				// TODO: get rid of the delays!
 				delay(50);								// wait for debounce time
 				adc_key_in	= analogRead(in_pin);   	// read the value from the sensor 
 				key 		= get_key(adc_key_in); 		// convert into key press
 				
 				if (key != oldkey)    
-				{   
-				//	Serial.print(key);
-				//	Serial.print(" \n ");
+				{
 					oldkey = key;
 					
 					if (key >=0) {
@@ -76,8 +74,8 @@ class ADKeyboard {
 						previous_time = 0;
 					}
 				} 
-		  	}	// Check if this key is being held down...
-			else if (key >=0 && key < NUM_KEYS && previous_time > 0 && millis()-previous_time > repeat_delay) {
+		  	}	// Check if this key is being held down... we don't want to repeat if it's 0 (enter) though.
+			else if (key >=1 && key < NUM_KEYS && previous_time > 0 && millis()-previous_time > repeat_delay) {
 				// Held down, past the timeout... Repeat!
 				previous_time	+= repeat_rate;
 				return key;

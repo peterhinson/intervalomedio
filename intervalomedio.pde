@@ -8,11 +8,11 @@
  *
  */
 
-#define DEBUG 					true
-#define __cplusplus				true
-
 #include <stdlib.h>
- 
+#include <wiring.h>
+#include <hardwareserial.h>
+
+#include "intervalomedio.h"
 #include "memdebug.h"
 #include "util.h"
 #include "LCDMenu.h"
@@ -20,8 +20,6 @@
 #include "ADKeyboard.h"
 #include "Event.h"
 
-#include <wiring.h>
-#include <hardwareserial.h>
 
 extern "C" void __cxa_pure_virtual() { for(;;); }
 
@@ -29,13 +27,6 @@ extern "C" void __cxa_pure_virtual() { for(;;); }
 LCDMenu 		*menu;
 ADKeyboard		*keypad;
 Intervalometer	*timelapse;
-
-#define kIntervalEvent 			10
-#define kExposureEvent 			11
-#define kDelayEvent				12
-#define kLCDBacklightEvent		20
-
-enum eDisplayType { TEXT, INT, FLOAT, MODE, BUTTON };
 
 /*
 class ParameterFormatter {
@@ -68,23 +59,29 @@ void handleEvent(Event);
 
 void setup()
 {
-	
+	int n, i;
 	Serial.begin(9600);
-	showmem();
+	
 	menu 		= new LCDMenu;
 	keypad	 	= new ADKeyboard(0);
 	timelapse	= new Intervalometer(12, 13);
 	
 	menu->addSection(new LCDMenuSection);
 	LCDMenuSection *menu_sec = menu->getCurrentSection();
-	String *toggle	= new String("Ok, sort of progress");
-//	char *toggle	= {test, test2};
+	
+	char start_stop[MAX_STATES][15]	= { "Start\0", "Stop\0" };
+	char *btn_ptr[MAX_STATES];
+	
+	for (n = 0; n < 2; n++) {
+		btn_ptr[n] = start_stop[n];
+	}
 
-	menu_sec->addParameter(new LCDMenuButton("Activity", kDelayEvent, *toggle, 6, 1, handleEvent));	
-	menu_sec->addParameter(new LCDMenuParameter("Interval (secs)", kIntervalEvent, 60.0f, 0.50f, 0.00, 172800.0, true, handleEvent));
-//	menu_sec->addParameter(new LCDMenuParameter("Exposure (msecs)", kExposureEvent, 250.0f, 25.0f, 25.0, 1200000.0, false, handleEvent));
+	menu_sec->addParameter(new LCDMenuButton("Activity", kTimelapseControlEvent, btn_ptr, 2, 0, handleEvent));
+	menu_sec->addParameter(new LCDMenuParameter("Interval (secs)", kIntervalEvent, 20.0f, 0.50f, 0.00, 172800.0, true, handleEvent));
+	menu_sec->addParameter(new LCDMenuParameter("Exposure (msecs)", kExposureEvent, 250.0f, 25.0f, 25.0, 1200000.0, false, handleEvent));
 	menu_sec->addParameter(new LCDMenuParameter("Backlight", kLCDBacklightEvent, 29.0f, 1.0f, 0.0, 29.0, false, handleEvent));
-	showmem();
+	menu_sec->addParameter(new LCDMenuButton("Memory Debug", kMemoryDebugNotice, btn_ptr, 2, 0, handleEvent));	
+	if (memory_debug) showmem();
 }
 
 
@@ -100,20 +97,21 @@ void loop()
 				menu->prevItem();
 				break;
 			case 1:
-				menu->incCurrentParam(1.0f);
+				menu->incCurrentParam(1);
 				break;
 			case 4:
-				menu->incCurrentParam(-1.0f);
+				menu->incCurrentParam(-1);
 				break;
 			case 0:
+				menu->clickCurrentParam();
 				timelapse->triggerShutter();
+				if (memory_debug) showmem();
 				break;
 			default:
 				break;
 		}
-		menu->stayAwake();
-		menu->setDirty(true);
-		showmem();
+	//	menu->stayAwake();
+	//	menu->setDirty(true);
 	}
 	timelapse->loop();
 	menu->printMenu();
@@ -124,17 +122,26 @@ void handleEvent(Event event) {
 	switch (event.source) {
 		case kIntervalEvent:
 			timelapse->setInterval(event.value);
-			
 			break;
+			
 		case kLCDBacklightEvent:
 			menu->backlightBrightness((int)(event.value));
+			break;
+			
+		case kTimelapseControlEvent:
+		Serial << "State: " << event.state << " . \n";
+			if (event.state == kStartIntervalometer)
+				timelapse->start();
+			else
+				timelapse->stop();
+			break;
+		
+		case kMemoryDebugNotice:
+			memory_debug = !memory_debug;
 			break;
 			
 		default:
 			break;
 	}
-}
-
-void setExpos(float) {
-	
+	if (memory_debug) showmem();
 }

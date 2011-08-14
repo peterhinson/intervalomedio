@@ -8,6 +8,7 @@ struct Event
 	int					source;
 	int					type;
 	float				value;
+	int					state;
 };
 
 #endif

@@ -11,15 +11,12 @@
 
 #ifndef LCDMenu_h
 #define LCDMenu_h
-//#include <stdlib.h>
-//#include <iostream>
 
 #include <WString.h>
 #include "WProgram.h"
+#include "intervalomedio.h"
 
 #include "Event.h"
-
-//using namespace std;
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * LCDMenuParameter
@@ -41,8 +38,6 @@ class LCDMenuParameter {
 		bool					_display_float;
 		SetValueCallback		_setValueCallback;
 		
-		String					_state_values;
-		
 	public:
 		LCDMenuParameter() { }
 		
@@ -63,10 +58,7 @@ class LCDMenuParameter {
 			_setValueCallback	= setValueCallback;
 		}
 		
-		virtual float getValue()
-		{
-			return _value;
-		}
+		virtual float getValue() { return _value; }
 		
 		virtual char* getDisplayValue()
 		{
@@ -99,6 +91,11 @@ class LCDMenuParameter {
 			setValue(_value + (_inc*steps));
 		}
 		
+		virtual void enterKey()
+		{
+			// Enter key was pressed, do we care?
+		}
+		
 		void registerSetValueCallback(SetValueCallback newCallback)
 		{
 			this->_setValueCallback = newCallback;
@@ -113,28 +110,35 @@ public LCDMenuParameter {
 		int						_num_states;
 		int						_state;
 		
+		char					*_state_values[MAX_STATES];
+		char					_states_copy[MAX_STATES][15];
+		
 	public:
 		LCDMenuButton() { }
 		
-		LCDMenuButton(char in_name[], int id_tag, String state_values[], int num_states=1, int init_state = 0, SetValueCallback setValueCallback = NULL) 
+		LCDMenuButton(char in_name[], int id_tag, char *state_values[], int num_states=1, int init_state = 0, SetValueCallback setValueCallback = NULL) 
 		{
 			init(in_name, id_tag, setValueCallback);
-			_state_values			= NULL;
-			_state_values			= String(state_values);
 // 			Serial.print(state_values);
 			_num_states				= num_states;
 			_state					= init_state;
+			
+			
+			for (int n = 0; n < num_states; n++) {
+				strcpy(_states_copy[n], state_values[n]);
+//				_state_values[n]	= state_values[n];
+			}
 		}
 		
 		char * getDisplayValue()
 		{
-			char buf[24];
-			_state_values.toCharArray(buf, 24);
+//			char buf[24];
+//			_state_values.toCharArray(buf, 24);
 //			cout << _state_values;
 			
 			//Serial << buf << "State: " << _state;
 			//Serial.println(_state_values);
-			return buf;
+			return _states_copy[_state];
 		//	return _state_values[_state];
 		}
 		
@@ -144,17 +148,21 @@ public LCDMenuParameter {
 		
 		void setValue(int new_value)
 		{
-			if (_state != new_value && validState(new_value)) {
+			if (validState(new_value)) {
 				_state = new_value;
 				if (_setValueCallback) { // If a callback is set for this value, create an event and call it.
 					Event event;
 					event.source	= _id;
 					event.time		= millis();
-					event.value		= _state;
-					event.object	= this;
+					event.state		= _state;
+//					event.object	= this;
 					_setValueCallback(event);
 				}			
 			} else if (!validState(_state)) _state = 0;
+		}
+		
+		void enterKey() {
+			setValue(_state);
 		}
 		
 		void incValue(int steps)
@@ -284,7 +292,7 @@ class LCDMenu {
 			setDirty(true);
 		}
 		
-		void incCurrentParam(float inc) 
+		void incCurrentParam(int inc) 
 		{
 			_cur_section->getCurrentParameter()->incValue(inc);
 			setDirty(true, 2);
@@ -298,6 +306,10 @@ class LCDMenu {
 				_root = section;		// Temp. Should only be for the first item.
 			
 			setDirty(true);
+		}
+		
+		void clickCurrentParam() {
+			getCurrentSection()->getCurrentParameter()->enterKey();
 		}
 		
 		LCDMenuSection * getCurrentSection() { return _cur_section; }
