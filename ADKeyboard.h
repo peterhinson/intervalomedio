@@ -1,10 +1,9 @@
 /*
- *  ADKeyboard.h
- *  Peter Hinson / 2011
+ *	ADKeyboard.h
+ *	Peter Hinson / 2011
  *	mewp.net
  *	
- *  Intervalometer making use of a keypad and LCD menu system.
- *	Sort of an excuse to develop classes for these components.
+ *	Code for reading an ADKeyboard analog button pad in a single wire fashion.
  *
  */
 
